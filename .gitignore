@@ -1,0 +1,10 @@
+# Ignore everything
+*
+
+# Except the 'codes' directory
+!/codes
+
+# And allow everything inside the 'codes' directory
+!/codes/**
+
+!.gitignore
