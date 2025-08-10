@@ -215,3 +215,78 @@ current.time <- function() {
   return(format(Sys.time(), "%Y.%m.%d_%H.%M.%S"))
 }
 
+################################################################# 
+############# Performance of cancer detection (binary classification)
+
+#
+# preds: a data frame with true label column (cancer_type_colum.name) + prediction score column (pred_column.name)
+# cancer_type_colum.name: column name (string) that contains each cancer type's name and "normal" class
+# pred_column.name: column name (string) of prediction scores
+# Return a data frame (ret): 2 row and columns. Column 1 is specificity, Column 2 is threshold, and the following each column is a cancer type; Row 1 and 2 values are AUC value (a string of AUC, a string of AUC (lower_bound, upper_bound) if conf.level is given) and sample size of this cancer type.
+#
+calc.auc.sens.spec_cancer.types_and_generate_report_for_cancer.detection <- function(
+    preds,
+    cancer_type_colum.name,
+    pred_column.name,
+    conf.level=0.95,
+    max_fp_for_specificity = 10, direction="<") {
+  if (is.null(preds) || (length(preds) == 1 && is.na(preds))) {
+    return(NA)
+  }
+  library(rlang)
+  library(dplyr)
+  cancer_type_col <- ensym_wenyuan(cancer_type_colum.name)
+  pred_col <- ensym_wenyuan(pred_column.name)
+  preds_df <- preds %>%
+    mutate(true_label_binary = ifelse(grepl("cancer|leukemia|melanoma|lymphoma", !!cancer_type_col), 1, 0))
+  # Calculate AUC for each cancer_type
+  cancer_types_list <- setdiff(unique(preds_df[[cancer_type_col]]), c("normal"))
+  ret <- setNames(data.frame(matrix(ncol = 3+ length(cancer_types_list), nrow = 2+max_fp_for_specificity+1)),
+                  c("threshold", "specificity", "all_cancers", cancer_types_list))
+  rownames(ret) = c("auc", "sample_size", paste0("fp", 0:max_fp_for_specificity))
+  for (c in setdiff(colnames(ret), c("threshold", "specificity"))) {
+    cat(c, "\n")
+    if (c == "all_cancers") {
+      z <- preds_df
+    } else {
+      z <- rbind(preds_df %>% filter((!!cancer_type_col==UQ(c)) | (!!cancer_type_col=="normal")))
+    }
+    auc_detail = calculate_auc_ci(z$true_label_binary, z[[pred_col]], conf.level, direction=direction)
+    sens_spec_detail = calculate_sens_spec(z$true_label_binary, z[[pred_col]], max_fp=max_fp_for_specificity, conf.level=conf.level)
+    if (is.null(sens_spec_detail) || (length(sens_spec_detail) == 1 && is.na(sens_spec_detail))) {
+      return(NA)
+    }
+    if (!is.na(conf.level)) {
+      auc = auc_detail[1]
+      auc_lower_bound = auc_detail[2]
+      auc_upper_bound = auc_detail[3]
+      ret["auc", c] = sprintf("%.4g (%.4g - %.4g)", auc, auc_lower_bound, auc_upper_bound)
+      for (k in 1:nrow(sens_spec_detail)) {
+        fp = sens_spec_detail[k, "false_positive"]
+        sensitivity = sens_spec_detail[k, "sensitivity"]
+        lower_bound_sens = sens_spec_detail[k, "lower_bound_sens"]
+        upper_bound_sens = sens_spec_detail[k, "upper_bound_sens"]
+        specificity = sens_spec_detail[k, "specificity"]
+        threshold = sens_spec_detail[k, "threshold"]
+        ret[paste0("fp",fp), c] = sprintf("%.4g (%.4g - %.4g)", sensitivity, lower_bound_sens, upper_bound_sens)
+        ret[paste0("fp",fp), "specificity"] = sprintf("%.4g", specificity) # Specificity for each cancer stage is the same, but different btw different fp
+        ret[paste0("fp",fp), "threshold"] = sprintf("%.4g", threshold) # Threshold for each cancer stage is the same, but different btw different fp
+      }
+    } else {
+      auc = auc_detail
+      ret["auc", c] = sprintf("%.4g", auc)
+      for (k in 1:nrow(sens_spec_detail)) {
+        fp = sens_spec_detail[k, "false_positive"]
+        sensitivity = sens_spec_detail[k, "sensitivity"]
+        specificity = sens_spec_detail[k, "specificity"]
+        threshold = sens_spec_detail[k, "threshold"]
+        ret[paste0("fp",fp), c] = sprintf("%.4g", sensitivity)
+        ret[paste0("fp",fp), "specificity"] = sprintf("%.4g", specificity) # Specificity for each cancer stage is the same, but different btw different fp
+        ret[paste0("fp",fp), "threshold"] = sprintf("%.4g", threshold) # Threshold for each cancer stage is the same, but different btw different fp
+      }
+    }
+    ret["sample_size", c] = sum(z$true_label_binary==1, na.rm = T)
+  }
+  ret <- remove_all_na_rows(ret)
+  return(ret)
+}
