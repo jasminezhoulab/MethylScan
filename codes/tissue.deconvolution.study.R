@@ -55,7 +55,7 @@ H = numeric(n_tissues)
 A = as.matrix(df.markers[, 3:2+n_tissues])
 
 for(sample in samples_list){
-  B = all.data[df.markers$marker_id, sample] 
+  B = df.data[df.markers$marker_id, sample]
   ret <- xsample(A, B, E, F, G, H)
   mean_res <- apply(ret$X, 2, mean)
   out_df.tissue.composition[sample, tissues_list] <- mean_res[tissues_list]
