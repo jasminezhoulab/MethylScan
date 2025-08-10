@@ -34,6 +34,7 @@ df.data <- t(df.data) # transpose to a matrix: rows are features and columns are
 samples_list <- colnames(df.data)
 
 ## Tissue-specific markers file
+## Rows are markers, columns are 29 tissues, the value of a marker for a tissue is the reference methylation value of this tissue in this marker. 
 df.markers <- fread(input_markers_file, header = T, data.table = FALSE)
 df.markers$marker_id <- as.character(df.markers$marker_id)
 rownames(df.markers) <- df.markers$marker_id
@@ -51,7 +52,7 @@ F = 1
 G = diag(n_tissues)
 H = numeric(n_tissues)
 
-A = as.matrix(markers.df[, 3:2+n_tissues])
+A = as.matrix(df.markers[, 3:2+n_tissues])
 
 for(sample in samples_list){
   B = all.data[df.markers$marker_id, sample] 
