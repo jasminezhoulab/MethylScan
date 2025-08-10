@@ -3,12 +3,12 @@ library(caret)
 library(tidyr)
 library(stringr)
 
-source("../common_funs.R")
+source("./common_funs.R")
 
 study_id <- "multi.cancer.detection.study"
 
-debug=FALSE
-# debug=TRUE
+# debug=FALSE
+debug=TRUE
 
 if (debug) {
   input_samples_cv_split_file = ""
