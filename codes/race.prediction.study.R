@@ -22,7 +22,11 @@ input_feature_matrix_file <- args[2]
 
 classifier = "ovr_LinearSVC_l2_c1"
 
-ratio_cutoff = 1 # ratio of two largest race membership probabilities, termed as race prediction confidence score.
+ratio_cutoff = 1.5 # ratio of two largest race membership probabilities, termed as race prediction confidence score.
+
+## Sample annocation and 5-fold CV split file
+## Columns: sample_id, true_label (cancer or normal), cancer_type (cancer types or normal), fold_id (Fold1, ..., Fold5)
+df.samples.cv <- read.csv(input_samples_cv_split_file)
 
 ## Feature matrix file for race prediction study
 ## Rows are samples and columns are cancer-typing  features
@@ -80,16 +84,15 @@ df.samples.cv <- df.samples.cv %>%
 
 # Output prediction scores, predicted labels, and true labels
 write.table(df.samples.cv,
-            file = sprintf("%s/race.prediction.study_pred.csv", out_dir),
-            sep = ",",
-            row.names = F,
-            col.names = T)
+            file = sprintf("%s/%s_pred.csv", out_dir, study_id),
+            sep = ",", row.names = F, col.names = T)
 
 
 z <- df.samples.cv %>% dplyr::filter(ratio >= ratio_cutoff)
 
 ret <- calc_confusion_matrix(z, "race", "pred.label", races_list)
 
+out_performance_file <- sprintf("%s/%s_performance.csv", out_dir, study_id)
 write("\n=== race prediction performance ===\n", file = out_performance_file, append = T)
 writeLines(out_str,
            file(out_performance_file, open = "a"))

@@ -78,7 +78,7 @@ result.cancer.detection = calc.auc.sens.spec_cancer.types_and_generate_report_fo
   df.samples.cv, "cancer_type", "pred_score_pancancer",
   conf.level=NA, max_fp_for_specificity=30, direction="auto")
 
-out_performance_file <- sprintf("%s/multi.cancer.detection.typing.study_performance.csv", out_dir)
+out_performance_file <- sprintf("%s/%s_performance.csv", out_dir, study_id)
 cat(sprintf("=== Cancer detection performance ===\nAUC_overall: %.4f\n\n", auc_overall), file = out_performance_file)
 write.table(result.cancer.detection, file = out_performance_file,
             sep = ",", row.names = F, col.names = T, append = T)
@@ -147,7 +147,7 @@ df.samples.cv <- df.samples.cv %>%
 
 # Output prediction scores and true labels for both cancer detection and typing
 write.table(df.samples.cv,
-            file = sprintf("%s/multi.cancer.detection.typing.study_pred.csv", out_dir),
+            file = sprintf("%s/%s_pred.csv", out_dir, study_id),
             sep = ",",
             row.names = F,
             col.names = T)
