@@ -10,11 +10,11 @@ study_id <- "liver.cancer.surveillance.study"
 args <- commandArgs(trailingOnly = T)
 
 ## Sample annocation and 5-fold CV split file
-## Columns: sample_id, true_label (cancer or normal), cancer_type (cancer types or normal), fold_id (Fold1, ..., Fold5)
+## Columns: sample_id, true_label (cancer or normal), fold_id (Fold1, ..., Fold5)
 input_samples_cv_split_file <- args[1]
 
-## Feature matrix file for multi-cancer detection
-## Rows are samples and columns are pancancer features
+## Feature matrix file for liver-cancer surveillance
+## Rows are samples and columns are liver-cancer features
 ## Columns: sample_id, feature1, feature2, ...
 input_feature_matrix_file_for_liver.cancer.detection <- args[2]
 
@@ -25,10 +25,10 @@ out_dir <- "./output"
 dir.create(out_dir, recursive = TRUE)
 
 ## Sample annocation and 5-fold CV split file
-## Columns: sample_id, true_label (cancer or normal), cancer_type (cancer types or normal), fold_id (Fold1, ..., Fold5)
+## Columns: sample_id, true_label (cancer or normal), fold_id (Fold1, ..., Fold5)
 df.samples.cv <- read.csv(input_samples_cv_split_file)
 
-## Feature matrix file for multi-cancer detection
+## Feature matrix file for liver-cancer surveillance
 ## Rows are samples and columns are pancancer features
 ## Columns: sample_id, feature1, feature2, ...
 df.data <- read.csv(input_feature_matrix_file_for_liver.cancer.detection, row.names = 1, check.names = FALSE)
