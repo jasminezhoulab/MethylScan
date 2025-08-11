@@ -3,6 +3,7 @@ library(caret)
 library(tidyr)
 library(stringr)
 library(rsample)
+library(limma)
 
 ################################################################# 
 ############# Dimension reduction
@@ -290,3 +291,278 @@ calc.auc.sens.spec_cancer.types_and_generate_report_for_cancer.detection <- func
   ret <- remove_all_na_rows(ret)
   return(ret)
 }
+
+################################################################# 
+############# Marker Discovery
+
+## Select cancer markers by the methylation matrix of the paired tissue samples (tumors and their adjacent normal tissues)
+## tumor_tissues_list: list of tumor samples whose sample_id contains a substring "_T", which could be replaced by "_N" that represents sample_id of the adjacent normal tissue sample.
+## tissue_matrix: a matrix (or data frame) with rows as markers and columns as tissue samples. It has both rownames and colnames.
+## diff_cutoff: the threshold that is required for the methylation level difference between the tumor and its adjacent normal tissue must be > diff_cutoff.
+## topK: Choose the top "topK" markers whose occurrence or frequency (number of tissue pairs whose methylation level difference >= diff_cutoff) is one of the largest "topK".
+select_markers_by_paired.tissues_and_occurrence(tumor_tissues_list,
+                                                tissue_matrix,
+                                                diff_cutoff,
+                                                topK) {
+  candidate_markers=rownames(tissue_matrix)
+  candidate_markers = candidate_markers[!grepl("chrX", candidate_markers)]
+  candidate_markers = candidate_markers[!grepl("chrY", candidate_markers)]
+  candidate_markers = candidate_markers[!grepl("chrM", candidate_markers)]
+  tissue_matrix <- tissue_matrix[candidate_markers, ]
+  diff_matrix <- data.frame(tissue_matrix[, tumor_tissues_list])
+  for (tumor_sample in tumor_tissues_list){
+    normal_sample <- gsub("_T", "_N", tumor_sample)
+    diff_matrix[,tumor_sample] <- tissue_matrix[,tumor_sample] - tissue_matrix[,normal_sample]
+  }
+  diff_matrix$num_over_dif_thresh <- apply(diff_matrix[, tumor_tissues_list], 1, function(x) {sum(x > diff_cutoff)})
+  topN_th = sort(diff_matrix$num_over_dif_thresh, decreasing = TRUE)[topK]
+  if (topN_th < 1) {
+    topN_th = 1
+  } 
+  diff_matrix <- subset(diff_matrix, diff_matrix$num_over_dif_thresh >= topN_th)
+  markers <- rownames(diff_matrix)
+  return(markers)
+}
+
+## Rows are features, columns are samples
+# Remove those rows whose number of NA exceeds half of all columns
+transform_data_rows <- function(df) {
+  sum.na <- function(x){ return(sum(is.na(x))) }
+  # This line counts NAs per row (correct)
+  feature.na.cnt <- apply(df, 1, sum.na)
+  # This line removes rows where ALL values are NA
+  df <- df[feature.na.cnt != ncol(df),]
+  # This line recalculates NA proportion per row (after dropping all-NA rows)
+  data.na.cnt <- apply(df, 1, sum.na) / ncol(df)
+  # This line removes rows with >= 50% NAs (this is the core filter)
+  return(df[data.na.cnt < 0.5,])
+}
+
+
+## Rows are samples, columns are features
+# Remove those columns whose number of NA exceeds half of all rows
+transform_data_cols <- function(df) {
+  sum.na <- function(x) { sum(is.na(x)) }
+  # Step 1: Count NA per column
+  feature.na.cnt <- apply(df, 2, sum.na)  # apply over columns
+  # Step 2: Remove columns where all values are NA
+  df <- df[, feature.na.cnt != nrow(df)]
+  # Step 3: Recalculate % NA per column (after dropping all-NA cols)
+  data.na.cnt <- apply(df, 2, sum.na) / nrow(df)
+  # Step 4: Keep columns with less than 50% missing
+  df <- df[, data.na.cnt < 0.5]
+  return(df)
+}
+
+make.contrasts.btw.two.classes <- function(classes) {
+  contr = c()
+  for (i in classes) {
+    for (j in classes) {
+      if (i != j) {
+        contr = c(contr, paste0(i, '-', j))
+      }
+    }
+  }
+  return(contr)
+}
+
+make.contrasts.btw.multi.classes <- function(classes, num.positive.classes) {
+  contr = c()
+  if (num.positive.classes==1) {
+    # only 1 class is plus, all other classes are minus
+    for (c in classes) {
+      # for example, "adipose-b_cell-colon-esophagus-heart-kidney-liver-lung-monocyte-neutrophils-pancreas-small_intestine-spleen-stomach-t_cell"
+      formula_ = paste0(c,paste0('-',classes[!(classes==c)],collapse=''),sep='')
+      contr = c(contr, formula_)
+    }
+  } else if (num.positive.classes>=length(classes)) {
+    stop('num.positive.classes must be < length(classes)')
+  } else {
+    # columns are combinations of classes
+    comb.classes = combn(classes, num.positive.classes)
+    for (j in 1:ncol(comb.classes)) {
+      # the combination of 'num.positive.classes' classes is plus, all other classes are minus
+      plus.classes = paste0(comb.classes[,j],collapse='+')
+      minus.classes = paste0('-',setdiff(classes,comb.classes[,j]),collapse='')
+      contr = c(contr, paste0(plus.classes, minus.classes))
+    }
+  }
+  return(contr)
+}
+
+select_top_general <- function(df, cutoff=0.7, num=50) {
+  filter_df <- df[abs(df$class.diff) > cutoff,]
+  filter_df <- filter_df[!grepl("^chrX|^chrY|^chrM", filter_df$feature.list), ]
+  df_sorted <- filter_df[order(abs(filter_df$logFC), decreasing = TRUE),]
+  return(head(df_sorted, num))
+}
+
+##
+## Use Limma method to select one-vs-rest features for multi-class data
+##   annot: a data frame of training samples, with two major columns
+##      (1) sample: training samples names
+##      (2) type: class names
+##   data: a data frame with rows as features and columns as samples, which is "data.beta.imp" in the original code
+##
+select_ovr_features_by.limma <- function(annot, data,
+                                cutoff, topk.features) {
+  classes_list <- sort(unique(annot$type))
+  n_class <- length(classes_list)
+  
+  design <- model.matrix(~0+type, data=annot)
+  # fit the linear model
+  vfit <- lmFit(data, design, na.action=na.omit)
+  
+  # remove NA for the linear model
+  coef <- vfit$coefficients
+  sum.na <- function(x){return(sum(is.na(x)))}
+  coef.na.cnt <- apply(coef, 1, sum.na)
+  valid.marker.id <- names(which(coef.na.cnt == 0))
+  data <- data[valid.marker.id, ]
+  
+  # fit the linear model again
+  vfit <- lmFit(data, design, na.action=na.omit)
+  
+  # create a contrast matrix for specific comparisons
+  contrasts <- c()
+  for (num.positive.class in c(1)) {
+    contrasts = c(contrasts, make.contrasts.btw.multi.classes(classes_list, num.positive.class))
+  }
+  contr.matrix <- makeContrasts(contrasts=contrasts, levels=classes_list)
+  # fit the contrasts
+  vfit <- contrasts.fit(vfit, contr.matrix)
+  tfit <- treat(vfit, lfc = 1, trend = F, robust = F)
+  results.bh <- decideTests(tfit)
+  
+  MARKER.LIST = list()
+  for(index_class in 1:length(contrasts)){
+    topK = dim(data)[1]
+    t = classes_list[index_class]
+    
+    treat.table <- topTreat(tfit,num=topK,coef=index_class,genelist=rownames(data),sort.by="p", resort.by="logFC")
+    
+    a = rownames(treat.table)
+    logFC <- treat.table$logFC
+    class.mean <- apply(as.matrix(data[a,t==annot[,'type']]), 1, mean, na.rm = T)
+    others.mean <- apply(as.matrix(data[a,t!=annot[,'type']]), 1, mean, na.rm = T)
+    class.na <- apply(is.na(as.matrix(data[a,t==annot[,'type']])), 1, sum)
+    others.na <- apply(is.na(as.matrix(data[a,t!=annot[,'type']])), 1, sum)
+    feature.list <- a
+
+    class.diff <- abs(class.mean - others.mean)
+    t.stats <- treat.table$t
+    adj.p.values <- treat.table$adj.P.Val
+
+    dt <- data.frame(classes_list = rep(t, each = topK),
+                     feature.list = feature.list, class.diff = class.diff,
+                     class.mean = class.mean, others.mean = others.mean,
+                     class.na = class.na, others.na = others.na,
+                     t.stats = t.stats, adj.p.values = adj.p.values,
+                     logFC = logFC, stringsAsFactors = F)
+    MARKER.LIST[[t]] <- dt
+  }
+  
+  # Initialize an empty list to store the marker vectors
+  marker_list <- list()
+  
+  # Iterate over each name in the MARKER.LIST
+  for (class_name in names(MARKER.LIST)) {
+    marker_list[[class_name]] <- rownames(select_top_general(MARKER.LIST[[class_name]], cutoff, topk.features))
+  }
+  
+  # Create the summary data frame with lengths
+  z <- data.frame(
+    t(sapply(marker_list, length))
+  )
+  
+  # Combine all markers into a single unique vector
+  union_ovr <- unique(unlist(marker_list))
+  
+  return(list(union=union_ovr, stat=z, details=marker_list))
+}
+
+##
+## Use Limma method to select one-vs-one features for multi-class data
+##   annot: a data frame of training samples, with two major columns
+##      (1) sample: training samples names
+##      (2) type: class names
+##   data: a data frame with rows as features and columns as samples, which is "data.beta.imp" in the original code
+##
+select_ovo_features_by.limma <- function(annot, data,
+                                cutoff, topk.features) {
+  classes_list <- sort(unique(annot$type))
+  n_class <- length(classes_list)
+  
+  design <- model.matrix(~0+type, data=annot)
+  # fit the linear model
+  vfit <- lmFit(data, design, na.action=na.omit)
+  
+  # remove NA for the linear model
+  coef <- vfit$coefficients
+  sum.na <- function(x){return(sum(is.na(x)))}
+  coef.na.cnt <- apply(coef, 1, sum.na)
+  valid.marker.id <- names(which(coef.na.cnt == 0))
+  data <- data[valid.marker.id, ]
+  
+  # fit the linear model again
+  vfit <- lmFit(data, design, na.action=na.omit)
+  
+  # create a contrast matrix for specific comparisons
+  contrasts <- make.contrasts.btw.two.classes(classes_list)
+  contr.matrix <- makeContrasts(contrasts=contrasts, levels=classes_list)
+  # fit the contrasts
+  vfit <- contrasts.fit(vfit, contr.matrix)
+  tfit <- treat(vfit, lfc = 1, trend = F, robust = F)
+  results.bh <- decideTests(tfit)
+
+  MARKER.LIST = list()
+  for(index_class in 1:length(contrasts)){
+    topK = dim(data)[1]
+    t = contrasts[index_class]
+    tissue_a = str_split(t, "-")[[1]][1]
+    tissue_b = str_split(t, "-")[[1]][2]
+
+    treat.table <- topTreat(tfit,num=topK,coef=index_class,genelist=rownames(data),sort.by="p", resort.by="logFC")
+    
+    a = rownames(treat.table)
+    logFC <- treat.table$logFC
+    class.mean <- apply(as.matrix(data[a,tissue_a==annot[,'type']]), 1, mean, na.rm = T)
+    others.mean <- apply(as.matrix(data[a,tissue_b==annot[,'type']]), 1, mean, na.rm = T)
+    class.na <- apply(is.na(as.matrix(data[a,tissue_a==annot[,'type']])), 1, sum)
+    others.na <- apply(is.na(as.matrix(data[a,tissue_b==annot[,'type']])), 1, sum)
+    feature.list <- a
+
+    class.diff <- class.mean - others.mean
+    t.stats <- treat.table$t
+    adj.p.values <- treat.table$adj.P.Val
+
+    dt <- data.frame(classes_list = rep(t, each = topK),
+                     feature.list = feature.list, class.diff = class.diff,
+                     class.mean = class.mean, others.mean = others.mean,
+                     class.na = class.na, others.na = others.na,
+                     t.stats = t.stats, adj.p.values = adj.p.values,
+                     logFC = logFC, stringsAsFactors = F)
+    MARKER.LIST[[t]] <- dt
+  }
+  
+  # Initialize an empty list to store the marker vectors
+  marker_list <- list()
+  
+  # Iterate over each name in the MARKER.LIST
+  for (class_name in names(MARKER.LIST)) {
+    marker_list[[class_name]] <- rownames(select_top_general(MARKER.LIST[[class_name]], cutoff, topk.features))
+  }
+  
+  # Create the summary data frame with lengths
+  z <- data.frame(
+    t(sapply(marker_list, length))
+  )
+  
+  # Combine all markers into a single unique vector
+  union_ovo <- unique(unlist(marker_list))
+  
+  return(list(union=union_ovo, stat=z, details=marker_list))
+}
+
+
+
