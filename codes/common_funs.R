@@ -4,6 +4,7 @@ library(tidyr)
 library(stringr)
 library(rsample)
 library(limma)
+library(matrixStats)
 
 ################################################################# 
 ############# Dimension reduction

@@ -15,6 +15,7 @@ This code requires the following R packages:
 3) rsample
 4) limSolve
 5) RhpcBLASctl
+6) limma
 
 ## Usage
 
