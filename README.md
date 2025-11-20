@@ -19,7 +19,7 @@ Most code is written in **R**, with optional helper scripts in **Python**.
 
 ---
 
-## Step-by-Step Pipeline (Important)
+## Step-by-Step Pipeline
 
 We have provided a comprehensive **step-by-step pipeline**, **example datasets**, and **detailed CLI documentation** in the **GitHub link referenced in the manuscript**.  
 Please refer to that page for exact replication of the analyses described in the paper.
