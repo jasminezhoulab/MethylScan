@@ -1,36 +1,147 @@
-# MethylScan codes
+# MethylScan Codes
 
 ## Overview
 
-This code is the implementation of five tasks: (1) multi-cancer detection and localization in the general population, (2) liver cancer surveillance in high-risk individuals, (3) liver disease classification, (4) race prediction, and (5) tissue deconvolution for identification of organ abnormalities.
+This repository contains the analysis code for **MethylScan™**, a cell-free DNA (cfDNA) methylome–based framework for cancer early detection, disease classification, and tissue-signal interpretation.
 
-The first four tasks use Linear Support Vector Machine (LSVM) classifier with the L2 penalty and default hyperparameter C=1 for binary classification (Tasks 1) or multi-class classification. The last task (tissue deconvolution) used the optimization process using R package `limSolve`.
+MethylScan supports **five analysis tasks**:
 
-## Prerequisite Packages
+1. **Multi-cancer detection and tissue-of-origin localization**  
+2. **Liver cancer surveillance** in high-risk individuals  
+3. **Liver disease classification** (e.g., HCC vs. benign/non-cancer liver diseases)  
+4. **Race prediction** using methylation signatures  
+5. **Tissue deconvolution** using constrained linear modeling across 29 tissue types
 
-This code requires the following R packages:
+Tasks 1–4 use **Linear Support Vector Machine (LSVM)** models with L2 regularization and hyperparameter **C = 1**.  
+Task 5 uses constrained optimization via **`limSolve`**.
 
-1) dplyr
-2) caret
-3) rsample
-4) limSolve
-5) RhpcBLASctl
-6) limma
+Most code is written in **R**, with optional helper scripts in **Python**.
+
+---
+
+## Step-by-Step Pipeline (Important)
+
+We have provided a comprehensive **step-by-step pipeline**, **example datasets**, and **detailed CLI documentation** in the **GitHub link referenced in the manuscript**.  
+Please refer to that page for exact replication of the analyses described in the paper.
+
+This README provides a high-level overview of directory structure, input formats, and usage.
+
+---
+
+## Required R Packages
+
+The following R packages are required:
+
+- `dplyr`  
+- `caret`  
+- `rsample`  
+- `limSolve`  
+- `RhpcBLASctl`  
+- `limma`
+
+Optional R packages:
+
+- `ggplot2`  
+- `pROC` / `PRROC`  
+- `readr`, `data.table`, `vroom`  
+
+Optional Python (for helper tools):
+
+- `numpy`  
+- `scikit-learn`  
+- `scipy`
+
+---
+
+## Repository Structure
+
+### `src/` — Core Analysis Code
+
+Contains R scripts for all five MethylScan tasks:
+
+- **Task 1: Multi-cancer detection & localization**  
+- **Task 2: Liver cancer surveillance**  
+- **Task 3: Liver disease classification**  
+- **Task 4: Race prediction**  
+- **Task 5: Tissue deconvolution**
+
+Each script typically:
+
+- Loads feature matrices & clinical annotations  
+- Applies 5-fold cross-validation using fold IDs  
+- Trains models (LSVM or constrained solving)  
+- Outputs predictions and performance summaries  
+
+### `demo/` — Example Data & Templates
+
+Contains:
+
+- Example annotation files  
+- Example feature matrices  
+- Tissue reference marker files (for Task 5)  
+- Toy data for demonstration  
+- Template input formats for all five tasks
+
+Use these as a reference for formatting your own cohort data.
+
+---
+
+## Input File Formats
+
+All input files are tab-delimited with headers.
+
+### Common Requirements Across Tasks
+
+- `sample_id`  
+- `fold_id` (Fold1–Fold5)  
+- Task-specific label column  
+- Feature matrix with columns:  
+  - `sample_id`, `feature1`, `feature2`, …  
+
+### Task-specific Inputs
+
+#### **1. Multi-Cancer Detection & Localization**
+- Clinical annotation (`true_label`, `cancer_type`, `fold_id`)
+- Feature matrices:
+  - Detection features  
+  - Typing (tissue-of-origin) features  
+
+#### **2. Liver Cancer Surveillance**
+- Annotation with:
+  - `true_label`  
+  - `cancer_type` or binary label  
+  - `fold_id`
+- Feature matrix for liver surveillance
+
+#### **3. Liver Disease Classification**
+- Annotation: `liver_disease`, `fold_id`
+- Feature matrix
+
+#### **4. Race Prediction**
+- Annotation: `race`, `fold_id`
+- Feature matrix
+
+#### **5. Tissue Deconvolution**
+- Annotation: `disease_type`
+- cfDNA marker matrix
+- 29-tissue reference marker matrix
+
+---
 
 ## Usage
 
-### Inputs
+The exact command-line arguments, flags, and detailed usage instructions are provided in the **step-by-step pipeline webpage linked in the manuscript**.
 
-1) input file of samples' clinical annotation file for multi-cancer detection and typing (including 5-fold cross validation's split), where Columns: sample_id, true_label (cancer or normal), cancer_type (cancer types or normal), fold_id (Fold1, ..., Fold5)
-2) input feature matrix file for multi-cancer detection, where Rows are samples and columns are pancancer features and Columns: sample_id, feature1, feature2, ...
-3) input feature matrix file for multi-cancer typing, where Rows are samples and columns are cancer-typing features and Columns: sample_id, feature1, feature2, ...
-4) input file of samples' clinical annotation file for liver cancer surveillance study (including 5-fold cross validation's split), where sample_id, true_label (cancer or normal), cancer_type (cancer types or normal), fold_id (Fold1, ..., Fold5)
-5) input file of samples' clinical annotation file for liver-cancer surveillance (including 5-fold cross validation's split), where sample_id, true_label (cancer or normal), fold_id (Fold1, ..., Fold5)
-6) input feature matrix file for liver-cancer surveillance, where Rows are samples and columns are liver-cancer features and Columns: sample_id, feature1, feature2, ...
-7) input file of samples' clinical annotation file for liver-etiology prediction (including 5-fold cross validation's split), where columns are sample_id, liver_disease, fold_id (Fold1, ..., Fold5)
-8) input feature matrix file for liver-etiology prediction, where Rows are samples and columns are liver-etiology features and Columns: sample_id, feature1, feature2, ...
-9) input file of samples' clinical annotation file for race prediction (including 5-fold cross validation's split), where columns are sample_id, race, fold_id (Fold1, ..., Fold5)
-10) input feature matrix file for race prediction, where Rows are samples and columns are race-specific features and Columns: sample_id, feature1, feature2, ...
-11) input file of samples' clinical annotation file for tissue deconvolution, where columns are sample_id, disease_type (normal, lung_noncancer_disease, liver_noncancer_disease, lung_cancer, liver_cancer)
-12) input feature matrix file for tissue deconvolution, where Rows are samples and columns are tissue-specific features and Columns: sample_id, feature1, feature2, ...
-13) input tissue-specific markers file for tissue deconvolution, where Rows are markers, columns are 29 tissues, the value of a marker for a tissue is the reference methylation value of this tissue in this marker.
+Below is a general example:
+
+```bash
+Rscript src/run_multi_cancer_detection.R \
+  --clinical demo/multi_cancer/clinical_annotation.tsv \
+  --feature_detection demo/multi_cancer/features_detection.tsv \
+  --feature_typing demo/multi_cancer/features_typing.tsv \
+  --out_dir results/multi_cancer/
+
+## Demo
+The demo/ directory includes:
+- Example sample annotation and split file for each task
+- Example data file for each task
