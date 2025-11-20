@@ -7,10 +7,10 @@ This repository contains the analysis code for **MethylScan™**, a cell-free DN
 MethylScan supports **five analysis tasks**:
 
 1. **Multi-cancer detection and tissue-of-origin localization**  
-2. **Liver cancer surveillance** in high-risk individuals  
-3. **Liver disease classification** (e.g., HCC vs. benign/non-cancer liver diseases)  
-4. **Race prediction** using methylation signatures  
-5. **Tissue deconvolution** using constrained linear modeling across 29 tissue types
+2. **Liver cancer surveillance** 
+3. **Liver disease classification** 
+4. **Race prediction**  
+5. **Tissue deconvolution**
 
 Tasks 1–4 use **Linear Support Vector Machine (LSVM)** models with L2 regularization and hyperparameter **C = 1**.  
 Task 5 uses constrained optimization via **`limSolve`**.
