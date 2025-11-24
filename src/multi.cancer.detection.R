@@ -7,7 +7,7 @@ study_id <- "multi.cancer.study_detection"
 
 args <- commandArgs(trailingOnly = TRUE)
 
-## Sample annocation and 5-fold CV split file
+## Sample annocation and training/testing sample split file
 ## Columns: sample_id, cancer_status (cancer or normal), column_test.or.train (value is a string that indicates test samples/rows)
 input_samples_split_file <- args[1]
 
@@ -91,3 +91,4 @@ write.table(test_samples, file = out_file, sep = ",", quote = FALSE, row.names =
 
 cat(sprintf("Output: %s\n", out_file))
 cat("   pred column (last one column): pred.score_multi.cancer\n")
+
