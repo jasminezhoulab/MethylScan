@@ -27,7 +27,7 @@ def main(debug=False):
         out_pred_file = './output/pred.csv'
     else:
         parser = argparse.ArgumentParser(description='Multi-class classification')
-        parser.add_argument('--classifier', type=str, required=True, help='Classification Method')
+        parser.add_argument('--classifier', type=str, default='ovr_LinearSVC_l2_c1', help='Classification Method')
         parser.add_argument('--feature_file', type=str, required=True, help='Input feature file (one feature per line)')
         parser.add_argument('--dim_reduction', type=str, default='none',
                     help="Dimension reduction option: 'svd100', 'svd50', or 'none' (default).")
