@@ -11,7 +11,7 @@ study_id <- "race.study"
 
 args <- commandArgs(trailingOnly = T)
 
-## Sample annocation and 5-fold CV split file
+## Sample annocation and training/testing sample split file
 ## Columns: sample_id, race, column_test.or.train (value is a string that indicates test samples/rows)
 input_samples_split_file <- args[1]
 
@@ -105,3 +105,4 @@ write.table(test_samples, file = out_pred_file, sep = ",", row.names = F, col.na
 
 cat(sprintf("Output: %s\n", out_pred_file))
 cat("   pred columns (last multiple columns): race_1, race_2, ..., ratio, pred_label\n")
+
