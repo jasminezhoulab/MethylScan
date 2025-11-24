@@ -74,7 +74,7 @@ Although the R and python code was developed in the environment of UCLA Hoffman2
 - Note:
   - The multi-class classifier Linear SVM with default parameters and the dimension reduction have been embedded in the code.
 
-#### **2. Liver Cancer Surveillance** (inputs of `liver.cancer.surveillance.R`)
+#### **Liver Cancer Surveillance** (inputs of `liver.cancer.surveillance.R`)
 - input sample info file, including columns regarding to clinical annotations, i.e., `sample_id`, `cancer_status` (normal or cancer) and training/testing sample split info, i.e., column_test.or.train (value is a string that indicates test samples/rows)
 - input data matrix file:
   - Rows are samples and columns are liver-cancer-specific features  
