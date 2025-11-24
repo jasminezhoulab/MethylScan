@@ -24,7 +24,6 @@ out_pred_file="./output/example_liver.disease.prediction_pred.csv"
 export PYTHONPATH="$PYTHONPATH:../src"
 
 python ../src/liver.disease.pred.py \
-    --classifier=ovr_LinearSVC_l2_c1 \
     --sample_split_file=$input_samples_file \
     --sample_column="sample_id" \
     --class_column="disease_type" \
