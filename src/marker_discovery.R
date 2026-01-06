@@ -1,6 +1,6 @@
 library(dplyr)
 
-source("../../src/utility_funs.R")
+source("../src/utility_funs.R")
 
 load_feature_matrix <- function(file, transpose=TRUE, remove.columns.with.half.NA=TRUE) {
   ## Feature matrix file
@@ -151,3 +151,4 @@ if (study_id %in% c("race.study")) {
         sprintf("Output: %s", out_marker_file)),
       sep = "\n")
 }
+
