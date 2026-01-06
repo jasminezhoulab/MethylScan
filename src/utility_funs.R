@@ -252,7 +252,7 @@ current.time <- function() {
 ############# Marker Discovery
 
 ## Select cancer markers by the methylation matrix of the paired tissue samples (tumors and their adjacent normal tissues)
-## tumor_tissues_list: list of tumor samples whose sample_id contains a substring "_T", which could be replaced by "_N" that represents sample_id of the adjacent normal tissue sample.
+## tumor_tissues_list: list of tumor samples whose sample_id contains a substring "_tumor", which could be replaced by "_normal.tissue" that represents sample_id of the adjacent normal tissue sample.
 ## tissue_matrix: a matrix (or data frame) with rows as markers and columns as tissue samples. It has both rownames and colnames.
 ## diff_cutoff: the threshold that is required for the methylation level difference between the tumor and its adjacent normal tissue must be > diff_cutoff.
 ## topK: Choose the top "topK" markers whose occurrence or frequency (number of tissue pairs whose methylation level difference >= diff_cutoff) is one of the largest "topK".
@@ -267,7 +267,7 @@ select_markers_by_paired.tissues_and_occurrence <- function(tumor_tissues_list,
   tissue_matrix <- tissue_matrix[candidate_markers, ]
   diff_matrix <- data.frame(tissue_matrix[, tumor_tissues_list])
   for (tumor_sample in tumor_tissues_list){
-    normal_sample <- gsub("_T", "_N", tumor_sample)
+    normal_sample <- gsub("_tumor", "_normal.tissue", tumor_sample)
     diff_matrix[,tumor_sample] <- tissue_matrix[,tumor_sample] - tissue_matrix[,normal_sample]
   }
   diff_matrix$num_over_dif_thresh <- apply(diff_matrix[, tumor_tissues_list], 1, function(x) {sum(x > diff_cutoff)})
